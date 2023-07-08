@@ -7,18 +7,8 @@
 use std::fmt;
 use std::rc::Rc;
 use itertools::Itertools;
+use crate::chordnova::pitch::Pitch;
 
-#[derive(PartialOrd)]
-#[derive(Ord)]
-pub struct Note(u8);
-
-impl Eq for Note {}
-
-impl PartialEq for Note {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
 
 pub enum OverflowState {
     NoOverflow,
@@ -46,7 +36,7 @@ pub struct CNChord {
            generation logics are separated into a standalone module.
      */
 
-    pub _notes: Vec<Note>,
+    pub _pitches: Vec<Pitch>,
 
     pub _voice_leading_max: i64,
     // Range of Movement, refers to Chord.vlmax
@@ -100,7 +90,7 @@ pub struct CNChord {
 impl CNChord {
     pub fn new() -> Self {
         Self {
-            _notes: Vec::new(),
+            _pitches: Vec::new(),
             _voice_leading_max: 0,
             s_size: 0,
             tension: 0.0,
@@ -127,14 +117,14 @@ impl CNChord {
         }
     }
 
-    pub fn from_notes(notes: Vec<Note>, ref_chord: Option<Rc<CNChord>>) -> CNChord {
+    pub fn from_notes(notes: Vec<Pitch>, ref_chord: Option<Rc<CNChord>>) -> CNChord {
         /*
             See also
                 Chord(const vector<int>& _notes, double _chroma_old = 0.0);
             in original C++ implementation
          */
         let ret = CNChord {
-            _notes: notes.into_iter().sorted().dedup().collect(),
+            _pitches: notes.into_iter().sorted().dedup().collect(),
             _voice_leading_max: 0,
             s_size: 0,
             tension: 0.0,
@@ -210,7 +200,7 @@ impl CNChord {
         unimplemented!();
     }
 
-    pub fn notes(&self) -> Vec<Note> {
+    pub fn notes(&self) -> Vec<Pitch> {
         /*
            always regarded as a sorted (L -> H) vector
            TODO: materialize this so we do not need to call list comprehension and sorted function
@@ -226,6 +216,6 @@ impl CNChord {
 
 impl fmt::Display for CNChord {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "HA!")
+        write!(f, "{}", self._pitches.iter().map(|pitch: &Pitch| pitch.get_name()).join(", "))
     }
 }

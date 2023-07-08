@@ -1,12 +1,14 @@
 mod chordnova {
     pub mod chord;
+    pub mod pitch;
 }
 
 use crate::chordnova::chord::{CNChord, OverflowState};
+use crate::chordnova::pitch::Pitch;
 
 fn main() {
     let chord = CNChord{
-        _notes: Vec::new(),
+        _pitches: vec![Pitch(60), Pitch(60 + 4), Pitch(60 + 7)],
         _voice_leading_max: 0,
         s_size: 0,
         tension: 0.0,
