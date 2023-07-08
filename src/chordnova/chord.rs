@@ -185,7 +185,6 @@ impl CNChord {
             at the expense of readability.
 
             In Python there is no point to follow this.
-
          */
         unimplemented!();
     }
@@ -208,9 +207,9 @@ impl CNChord {
         unimplemented!();
     }
 
-    pub fn t_size(&self) -> u16 {
+    pub fn t_size(&self) -> usize {
         /* n; size of notes */
-        unimplemented!();
+        return self._pitches.len();
     }
 }
 
