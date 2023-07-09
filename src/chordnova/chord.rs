@@ -31,91 +31,96 @@ pub enum OutputMode {
 }
 
 pub struct CNChordExtendedData {
+    /// Range of Movement, refers to Chord.vlmax
     pub _voice_leading_max: i64,
-    // Range of Movement, refers to Chord.vlmax
+    /// m; size of note_set
     pub s_size: i16,
-    // m; size of note_set
+    /// t
     pub tension: f32,
-    // t
+    /// h
     pub thickness: f32,
-    // h
+    /// r
     pub root: i16,
-    // r
+    /// g
     pub g_center: i16,
-    // g
+    /// s
     pub span: i16,
-    // s
+    /// ss
     pub sspan: i16,
-    // ss
+    /// x
     pub similarity: i16,
-    // x
+    /// kk
     pub _chroma_old: f32,
-    // kk
+    /// k
     pub chroma: f32,
-    // k
+    /// Q
     pub q_indicator: f32,
-    // Q
+    /// c
     pub common_note: i16,
-    // c
-    pub sv: i16,  // sum of vec, Σvec
-
+    /// sum of vec, Σvec
+    pub sv: i16,
     pub overflow_state: OverflowState,
     pub hide_octave: bool,
+    ///name of each note in the chord
     pub name: Option<String>,
-    //name of each note in the chord
+    /// name and octave of each note in the chord
     pub name_with_octave: Option<String>,
-    // name and octave of each note in the chord
+    /// v
     pub vec: Vec<i16>,
-    // v
+    /// d
     pub self_diff: Vec<i16>,
-    // d
-    pub count_vec: Vec<i16>,  // vec
-
-    pub ref_chord: Option<Rc<CNChord>>,  // reference chord to calculate chroma_old. This is to replace prev_chroma_old
-
-    /*
-       We want to make evaluation lazy. Evaluation won't be triggered
-       until property is accessed.
-     */
-    pub _dirty: bool,
+    /// vec
+    pub count_vec: Vec<i16>,
+    /// reference chord to calculate chroma_old. This is to replace prev_chroma_old
+    pub ref_chord: Option<Rc<CNChord>>,
 }
 
 pub struct ChordDiff {
     pub diff_vec: Vec<i16>,
+    /// sum of (absolute value) of (diff) vector
+    pub sv: i16,
+    /// norm of the diff vector. Penalize large diff more.
+    pub norm: f64,
 }
 
 impl ChordDiff {
+    pub fn new(diff_vec: Vec<i16>) -> Self {
+        let sv = ChordDiff::sv(&diff_vec);
+        let norm = ChordDiff::norm(&diff_vec);
+        ChordDiff {
+            diff_vec,
+            sv,
+            norm,
+        }
+    }
+
     /// sum of (absolute value) of (diff) vector
     /// Measuring the distance of two chords in the original cpp ChordNova implementation
-    pub fn sv(&self) -> i16 {
-        self.diff_vec.iter().map(|x| (*x as i16).abs()).sum()
+    fn sv(diff_vec: &Vec<i16>) -> i16 {
+        diff_vec.iter().map(|x| (*x as i16).abs()).sum()
     }
 
     /// norm of the diff vector. Penalize large diff more.
-    pub fn norm(&self) -> f64 {
-        (self.diff_vec.iter().map(|x| (*x as i32).pow(2)).sum::<i32>() as f64).sqrt()
+    fn norm(diff_vec: &Vec<i16>) -> f64 {
+        (diff_vec.iter().map(|x| (*x as i32).pow(2)).sum::<i32>() as f64).sqrt()
     }
 }
 
 impl fmt::Display for ChordDiff {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "<ChordDiff: {}, sv: {}, norm: {:.2}>", iterable_to_str(&self.diff_vec), self.sv(), self.norm())
+        write!(f, "<ChordDiff: {}, sv: {}, norm: {:.2}>", iterable_to_str(&self.diff_vec), self.sv, self.norm)
     }
 }
 
-
+/// Implementation of Chord based on
+///  chorddata.h / chorddata.cpp
+/// of original C++ implementation
+///
+/// But:
+///  1. Attempt to utilize music21 to avoid re-inventing the wheels
+///  2. It only contains model information;
+///     generation logics are separated into a standalone module.
 pub struct CNChord {
-    /*
-       Implementation of Chord based on
-        chorddata.h / chorddata.cpp
-       of original C++ implementation
-
-       But:
-        1. Attempt to utilize music21 to avoid re-inventing the wheels
-        2. It only contains model information;
-           generation logics are separated into a standalone module.
-     */
-
     pub _pitches: Vec<Pitch>,
 }
 
@@ -127,24 +132,20 @@ impl CNChord {
         }
     }
 
+    /// See also
+    ///     Chord(const vector<int>& _notes, double _chroma_old = 0.0);
+    /// in original C++ implementation
     pub fn from_notes(notes: Vec<Pitch>, ref_chord: Option<Rc<CNChord>>) -> CNChord {
-        /*
-            See also
-                Chord(const vector<int>& _notes, double _chroma_old = 0.0);
-            in original C++ implementation
-         */
         let ret = CNChord {
             _pitches: notes.into_iter().sorted().dedup().collect(),
         };
         return ret;
     }
 
+    /// an integer representing 'note_set'; unique for different 'note_set's
+    /// Assign a unique id for each pitch set (according to set theory)
+    /// See also: https://web.mit.edu/music21/doc/moduleReference/moduleChord.html#music21.chord.Chord.chordTablesAddress
     pub fn set_id(&self) -> i64 {
-        /*
-            an integer representing 'note_set'; unique for different 'note_set's
-            Assign a unique id for each pitch set (according to set theory)
-            See also: https://web.mit.edu/music21/doc/moduleReference/moduleChord.html#music21.chord.Chord.chordTablesAddress
-         */
         unimplemented!();
     }
 
@@ -157,53 +158,25 @@ impl CNChord {
     //     return self._voice_leading_max;
     // }
 
+    /// interface of '_find_vec'
+    ///
+    /// See Also:
+    ///     void find_vec(Chord& new_chord, bool in_analyser = false, bool in_substitution = false);
+    /// In original C++ Implementation
     pub fn find_vec(&self, in_analyser: bool, in_substitution: bool) -> CNChord {
-        /*
-            interface of '_find_vec'
-
-            See Also:
-                void find_vec(Chord& new_chord, bool in_analyser = false, bool in_substitution = false);
-            In original C++ Implementation
-
-            Note:
-
-            The original function in C++ implementation is using pass by reference signature,
-            which is commonly used in C++ for memory optimization
-            at the expense of readability.
-
-            In Python there is no point to follow this.
-         */
         unimplemented!();
     }
 
-    pub fn inverse_param(&self) -> () {
-        /*
-         # Swap
-                self.prev_chroma_old, self.chroma_old = self.chroma_old, self.prev_chroma_old
-                self.chroma *= -1
-                self.Q_indicator *= -1
-         */
-        unimplemented!();
-    }
-
-    pub fn notes(&self) -> Vec<Pitch> {
-        /*
-           always regarded as a sorted (L -> H) vector
-           TODO: materialize this so we do not need to call list comprehension and sorted function
-         */
-        unimplemented!();
-    }
-
+    /// n; size of notes
     pub fn t_size(&self) -> usize {
-        /* n; size of notes */
         return self._pitches.len();
     }
 
     pub fn diff(&self, chord: &CNChord) -> Result<ChordDiff, ParseCNChordError> {
         if self.t_size() == chord.t_size() {
-            Ok(ChordDiff {
-                diff_vec: (0..(self.t_size().min(chord.t_size()))).map(|index| i16::from(chord._pitches[index].0) - i16::from(self._pitches[index].0)).collect()
-            })
+            Ok(ChordDiff::new(
+                (0..(self.t_size().min(chord.t_size()))).map(|index| i16::from(chord._pitches[index].0) - i16::from(self._pitches[index].0)).collect()
+            ))
         } else {
             Err(ParseCNChordError { msg: format!("size difference: {} != {}", self.t_size(), chord.t_size()) })
         }
