@@ -8,6 +8,8 @@ include = ["**/*.rs", "Cargo.toml", "Cargo.lock", "config.json"]
 
 [dependencies]
 itertools = "0.10.5"
+pest = "2.5.6"
+pest_derive = "2.5.6"
 
 [build-dependencies]
 

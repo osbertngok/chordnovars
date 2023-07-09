@@ -1,38 +1,16 @@
 mod chordnova {
     pub mod chord;
     pub mod pitch;
+    pub mod pitchparser;
 }
 
 use crate::chordnova::chord::{CNChord, OverflowState};
 use crate::chordnova::pitch::Pitch;
 
+use std::str::FromStr;
+
 fn main() {
-    let chord = CNChord{
-        _pitches: vec![Pitch(60), Pitch(60 + 4), Pitch(60 + 7)],
-        _voice_leading_max: 0,
-        s_size: 0,
-        tension: 0.0,
-        thickness: 0.0,
-        root: 0,
-        g_center: 0,
-        span: 0,
-        sspan: 0,
-        similarity: 0,
-        _chroma_old: 0.0,
-        chroma: 0.0,
-        q_indicator: 0.0,
-        common_note: 0,
-        sv: 0,
-        overflow_state: OverflowState::NoOverflow,
-        hide_octave: false,
-        name: None,
-        name_with_octave: None,
-        vec: vec![],
-        self_diff: vec![],
-        count_vec: vec![],
-        ref_chord: None,
-        _dirty: false
-    };
+    let chord: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
     println!("{}", chord);
     println!("Hello world!");
 }

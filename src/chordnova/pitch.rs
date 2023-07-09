@@ -1,4 +1,9 @@
+use crate::chordnova::pitchparser::pest::Parser;
+use crate::chordnova::pitchparser::Rule;
+use crate::chordnova::pitchparser::PitchParser;
+
 use std::fmt;
+use std::str::FromStr;
 
 pub enum Stepname {
     C,
@@ -24,6 +29,24 @@ impl fmt::Display for Stepname {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseStepnameError;
+
+impl FromStr for Stepname {
+    type Err = ParseStepnameError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "A" => Ok(Stepname::A),
+            "B" => Ok(Stepname::B),
+            "C" => Ok(Stepname::C),
+            "D" => Ok(Stepname::D),
+            "E" => Ok(Stepname::E),
+            "F" => Ok(Stepname::F),
+            "G" => Ok(Stepname::G),
+            e => Err(ParseStepnameError {})
+        }
+    }
+}
 
 pub enum Accidental {
     Natural,
@@ -38,6 +61,21 @@ impl fmt::Display for Accidental {
             Accidental::Sharp => "#",
             Accidental::Flat => "-",
         })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseAccidentalError;
+
+impl FromStr for Accidental {
+    type Err = ParseAccidentalError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "#" => Ok(Accidental::Sharp),
+            "-" => Ok(Accidental::Flat),
+            "" => Ok(Accidental::Natural),
+            e => Err(ParseAccidentalError {})
+        }
     }
 }
 
@@ -78,11 +116,15 @@ impl PitchClass {
 }
 
 
-pub fn convert_ps_to_step(midi_note_number: u8) -> (Stepname, Accidental, i8) {
+pub fn convert_ps_to_step(midi_note_number: u8) -> (Stepname, Accidental, Option<u8>) {
     // from https://github.com/cuthbertLab/music21/blob/master/music21/pitch.py
     let pitch_class = PitchClass(midi_note_number % 12);
     let (step_name, accidental) = pitch_class.to_step_name();
-    return (step_name, accidental, (TryInto::<i16>::try_into(midi_note_number).unwrap() / 12 - 1).try_into().unwrap());
+    let octive = midi_note_number / 12;
+    return (step_name, accidental, match octive {
+        1..=u8::MAX => Some(octive - 1),
+        0 => None
+    });
 }
 
 
@@ -91,13 +133,71 @@ pub fn convert_ps_to_step(midi_note_number: u8) -> (Stepname, Accidental, i8) {
 pub struct Pitch(pub u8);
 
 impl Pitch {
-    pub fn convert_ps_to_step(&self) -> (Stepname, Accidental, i8) {
+    pub fn convert_ps_to_step(&self) -> (Stepname, Accidental, Option<u8>) {
         convert_ps_to_step(self.0)
     }
 
     pub fn get_name(&self) -> String {
         let (stepname, acc, octive) = self.convert_ps_to_step();
-        format!("{}{}{}", stepname, acc, octive)
+        format!("{}{}{}", stepname, acc, match octive {
+            Some(t) => t.to_string(),
+            None => String::new()
+        })
+    }
+
+    pub fn from_stepname(stepname: Stepname, accidental: Accidental, octive: Option<u8>) -> Pitch {
+        let midi_note: i16 = match stepname {
+            Stepname::A => 9_i16,
+            Stepname::B => 11_i16,
+            Stepname::C => 0_i16,
+            Stepname::D => 2_i16,
+            Stepname::E => 4_i16,
+            Stepname::F => 5_i16,
+            Stepname::G => 7_i16
+        } + match accidental {
+            Accidental::Natural => 0_i16,
+            Accidental::Sharp => 1_i16,
+            Accidental::Flat => -1_i16
+        } + match octive {
+            Some(p) => (i16::from(p) + 1) * 12_i16,
+            None => 0
+        };
+        Pitch(u8::try_from(midi_note).unwrap())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParsePitchError;
+
+impl FromStr for Pitch {
+    type Err = ParsePitchError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let wrapped_pairs = PitchParser::parse(Rule::PITCH, s);
+        match wrapped_pairs {
+            Ok(mut pairs) => {
+                match pairs.next() {
+                    Some(pair) => match pair.as_rule() {
+                        Rule::PITCH => {
+                            let mut pitch_pair = pair.into_inner();
+                            let stepname: Stepname = pitch_pair.next().unwrap().as_str().parse().unwrap();
+                            let accidental: Accidental = pitch_pair.next()
+                                .unwrap()
+                                .as_str().parse().unwrap();
+                            let octive: Option<u8> = match pitch_pair.next()
+                                .unwrap()
+                                .as_str() {
+                                "" => None,
+                                p => Some(p.parse::<u8>().unwrap().to_owned())
+                            };
+                            Ok(Pitch::from_stepname(stepname, accidental, octive))
+                        }
+                        e => Err(ParsePitchError {})
+                    },
+                    None => Err(ParsePitchError {})
+                }
+            }
+            Err(e) => Err(ParsePitchError {})
+        }
     }
 }
 

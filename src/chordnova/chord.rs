@@ -4,7 +4,12 @@
    Port to Rust by osbertngok
  */
 
+use crate::chordnova::pitchparser::pest::Parser;
+use crate::chordnova::pitchparser::Rule;
+use crate::chordnova::pitchparser::PitchParser;
+
 use std::fmt;
+use std::str::FromStr;
 use std::rc::Rc;
 use itertools::Itertools;
 use crate::chordnova::pitch::Pitch;
@@ -23,21 +28,7 @@ pub enum OutputMode {
     TextOnly,
 }
 
-
-pub struct CNChord {
-    /*
-       Implementation of Chord based on
-        chorddata.h / chorddata.cpp
-       of original C++ implementation
-
-       But:
-        1. Attempt to utilize music21 to avoid re-inventing the wheels
-        2. It only contains model information;
-           generation logics are separated into a standalone module.
-     */
-
-    pub _pitches: Vec<Pitch>,
-
+pub struct CNChordExtendedData {
     pub _voice_leading_max: i64,
     // Range of Movement, refers to Chord.vlmax
     pub s_size: i16,
@@ -87,33 +78,27 @@ pub struct CNChord {
     pub _dirty: bool,
 }
 
+
+pub struct CNChord {
+    /*
+       Implementation of Chord based on
+        chorddata.h / chorddata.cpp
+       of original C++ implementation
+
+       But:
+        1. Attempt to utilize music21 to avoid re-inventing the wheels
+        2. It only contains model information;
+           generation logics are separated into a standalone module.
+     */
+
+    pub _pitches: Vec<Pitch>,
+}
+
 impl CNChord {
     pub fn new() -> Self {
         Self {
             _pitches: Vec::new(),
-            _voice_leading_max: 0,
-            s_size: 0,
-            tension: 0.0,
-            thickness: 0.0,
-            root: 0,
-            g_center: 0,
-            span: 0,
-            sspan: 0,
-            similarity: 0,
-            _chroma_old: 0.0,
-            chroma: 0.0,
-            q_indicator: 0.0,
-            common_note: 0,
-            sv: 0,
-            overflow_state: OverflowState::NoOverflow,
-            hide_octave: false,
-            name: None,
-            name_with_octave: None,
-            vec: Vec::new(),
-            self_diff: Vec::new(),
-            count_vec: Vec::new(),
-            ref_chord: None,
-            _dirty: false,
+
         }
     }
 
@@ -125,29 +110,6 @@ impl CNChord {
          */
         let ret = CNChord {
             _pitches: notes.into_iter().sorted().dedup().collect(),
-            _voice_leading_max: 0,
-            s_size: 0,
-            tension: 0.0,
-            thickness: 0.0,
-            root: 0,
-            g_center: 0,
-            span: 0,
-            sspan: 0,
-            similarity: 0,
-            _chroma_old: 0.0,
-            chroma: 0.0,
-            q_indicator: 0.0,
-            common_note: 0,
-            sv: 0,
-            overflow_state: OverflowState::NoOverflow,
-            hide_octave: false,
-            name: None,
-            name_with_octave: None,
-            vec: vec![],
-            self_diff: vec![],
-            count_vec: vec![],
-            ref_chord,
-            _dirty: false,
         };
         return ret;
     }
@@ -161,14 +123,14 @@ impl CNChord {
         unimplemented!();
     }
 
-    pub fn voice_leading_max(&self) -> i64 {
-        /*
-           See also
-             void _set_vl_max(const int&);
-           in original C++ Implementation
-         */
-        return self._voice_leading_max;
-    }
+    // pub fn voice_leading_max(&self) -> i64 {
+    //     /*
+    //        See also
+    //          void _set_vl_max(const int&);
+    //        in original C++ Implementation
+    //      */
+    //     return self._voice_leading_max;
+    // }
 
     pub fn find_vec(&self, in_analyser: bool, in_substitution: bool) -> CNChord {
         /*
@@ -216,5 +178,37 @@ impl CNChord {
 impl fmt::Display for CNChord {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self._pitches.iter().map(|pitch: &Pitch| pitch.get_name()).join(", "))
+    }
+}
+
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseCNChordError{
+    msg: String
+}
+
+impl FromStr for CNChord {
+    type Err = ParseCNChordError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let wrapped_pairs = PitchParser::parse(Rule::FULL_PITCHES, s);
+        match wrapped_pairs {
+            Ok(mut pairs) => {
+                match pairs.next() {
+                    Some(pair) => match pair.as_rule() {
+                        Rule::PITCHES => {
+                            let pitches = pair.into_inner().map(|p| Pitch::from_str(p.as_str()).unwrap()).collect();
+                            Ok(CNChord{_pitches:pitches})
+                        }
+                        e => Err(ParseCNChordError{
+                            msg: String::from("Hi")
+                        })
+                    },
+                    None => Err(ParseCNChordError{
+                        msg: String::from(format!("{:?}", pairs))
+                    })
+                }
+            }
+            Err(e) => Err(ParseCNChordError{msg: String::from(e.to_string())})
+        }
     }
 }
