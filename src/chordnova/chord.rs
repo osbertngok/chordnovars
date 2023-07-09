@@ -12,7 +12,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::rc::Rc;
 use itertools::Itertools;
-use crate::chordnova::pitch::Pitch;
+use crate::chordnova::pitch::{ParsePitchError, Pitch};
 
 
 pub enum OverflowState {
@@ -183,8 +183,8 @@ impl fmt::Display for CNChord {
 
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct ParseCNChordError{
-    msg: String
+pub struct ParseCNChordError {
+    msg: String,
 }
 
 impl FromStr for CNChord {
@@ -196,19 +196,24 @@ impl FromStr for CNChord {
                 match pairs.next() {
                     Some(pair) => match pair.as_rule() {
                         Rule::PITCHES => {
-                            let pitches = pair.into_inner().map(|p| Pitch::from_str(p.as_str()).unwrap()).collect();
-                            Ok(CNChord{_pitches:pitches})
+                            let pitches: Result<Vec<Pitch>, ParsePitchError> = pair.into_inner().map(|p| Pitch::from_str(p.as_str())).collect();
+                            match pitches {
+                                Ok(pcs) => Ok(CNChord { _pitches: pcs }),
+                                Err(e) => Err(ParseCNChordError {
+                                    msg: e.to_string()
+                                })
+                            }
                         }
-                        e => Err(ParseCNChordError{
+                        e => Err(ParseCNChordError {
                             msg: String::from("Hi")
                         })
                     },
-                    None => Err(ParseCNChordError{
+                    None => Err(ParseCNChordError {
                         msg: String::from(format!("{:?}", pairs))
                     })
                 }
             }
-            Err(e) => Err(ParseCNChordError{msg: String::from(e.to_string())})
+            Err(e) => Err(ParseCNChordError { msg: String::from(e.to_string()) })
         }
     }
 }

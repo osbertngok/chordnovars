@@ -167,7 +167,15 @@ impl Pitch {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct ParsePitchError;
+pub struct ParsePitchError{
+    msg: String
+}
+
+impl fmt::Display for ParsePitchError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<ParsePitchError: {}>", self.msg)
+    }
+}
 
 impl FromStr for Pitch {
     type Err = ParsePitchError;
@@ -191,12 +199,18 @@ impl FromStr for Pitch {
                             };
                             Ok(Pitch::from_stepname(stepname, accidental, octive))
                         }
-                        e => Err(ParsePitchError {})
+                        e => Err(ParsePitchError {
+                            msg: String::from("")
+                        })
                     },
-                    None => Err(ParsePitchError {})
+                    None => Err(ParsePitchError {
+                        msg: String::from("")
+                    })
                 }
             }
-            Err(e) => Err(ParsePitchError {})
+            Err(e) => Err(ParsePitchError {
+                msg: String::from("")
+            })
         }
     }
 }

@@ -12,5 +12,4 @@ use std::str::FromStr;
 fn main() {
     let chord: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
     println!("{}", chord);
-    println!("Hello world!");
 }
