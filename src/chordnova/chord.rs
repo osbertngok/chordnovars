@@ -8,11 +8,13 @@ use crate::chordnova::pitchparser::pest::Parser;
 use crate::chordnova::pitchparser::Rule;
 use crate::chordnova::pitchparser::PitchParser;
 
+
 use std::fmt;
 use std::str::FromStr;
 use std::rc::Rc;
 use itertools::Itertools;
 use crate::chordnova::pitch::{ParsePitchError, Pitch};
+use crate::chordnova::util::iterable_to_str;
 
 
 pub enum OverflowState {
@@ -55,7 +57,7 @@ pub struct CNChordExtendedData {
     // Q
     pub common_note: i16,
     // c
-    pub sv: i16,  // sv, Σvec
+    pub sv: i16,  // sum of vec, Σvec
 
     pub overflow_state: OverflowState,
     pub hide_octave: bool,
@@ -76,6 +78,29 @@ pub struct CNChordExtendedData {
        until property is accessed.
      */
     pub _dirty: bool,
+}
+
+pub struct ChordDiff {
+    pub diff_vec: Vec<i16>,
+}
+
+impl ChordDiff {
+    /// sum of (absolute value) of (diff) vector
+    /// Measuring the distance of two chords in the original cpp ChordNova implementation
+    pub fn sv(&self) -> i16 {
+        self.diff_vec.iter().map(|x| (*x as i16).abs()).sum()
+    }
+
+    /// norm of the diff vector. Penalize large diff more.
+    pub fn norm(&self) -> f64 {
+        (self.diff_vec.iter().map(|x| (*x as i32).pow(2)).sum::<i32>() as f64).sqrt()
+    }
+}
+
+impl fmt::Display for ChordDiff {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<ChordDiff: {}, sv: {}, norm: {:.2}>", iterable_to_str(&self.diff_vec), self.sv(), self.norm())
+    }
 }
 
 
@@ -172,6 +197,16 @@ impl CNChord {
     pub fn t_size(&self) -> usize {
         /* n; size of notes */
         return self._pitches.len();
+    }
+
+    pub fn diff(&self, chord: &CNChord) -> Result<ChordDiff, ParseCNChordError> {
+        if self.t_size() == chord.t_size() {
+            Ok(ChordDiff {
+                diff_vec: (0..(self.t_size().min(chord.t_size()))).map(|index| i16::from(chord._pitches[index].0) - i16::from(self._pitches[index].0)).collect()
+            })
+        } else {
+            Err(ParseCNChordError { msg: format!("size difference: {} != {}", self.t_size(), chord.t_size()) })
+        }
     }
 }
 
