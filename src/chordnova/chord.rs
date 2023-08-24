@@ -78,9 +78,15 @@ pub struct CNChordExtendedData {
 pub struct ChordDiff {
     pub diff_vec: Vec<i16>,
     /// sum of (absolute value) of (diff) vector
-    pub sv: i16,
+    pub sv: u16,
     /// norm of the diff vector. Penalize large diff more.
     pub norm: f64,
+}
+
+impl Clone for ChordDiff {
+    fn clone(&self) -> Self {
+        ChordDiff::new(self.diff_vec.iter().map(|x| *x).collect::<Vec<i16>>())
+    }
 }
 
 impl ChordDiff {
@@ -96,13 +102,17 @@ impl ChordDiff {
 
     /// sum of (absolute value) of (diff) vector
     /// Measuring the distance of two chords in the original cpp ChordNova implementation
-    fn sv(diff_vec: &Vec<i16>) -> i16 {
-        diff_vec.iter().map(|x| (*x as i16).abs()).sum()
+    fn sv(diff_vec: &Vec<i16>) -> u16 {
+        u16::try_from(diff_vec.iter().map(|x| (*x).abs() as u32).sum::<u32>()).unwrap()
     }
 
     /// norm of the diff vector. Penalize large diff more.
     fn norm(diff_vec: &Vec<i16>) -> f64 {
         (diff_vec.iter().map(|x| (*x as i32).pow(2)).sum::<i32>() as f64).sqrt()
+    }
+
+    fn negate(&self) -> ChordDiff {
+        ChordDiff::new(self.diff_vec.iter().map(|x| -*x).collect::<Vec<i16>>())
     }
 }
 
@@ -135,11 +145,15 @@ impl CNChord {
     /// See also
     ///     Chord(const vector<int>& _notes, double _chroma_old = 0.0);
     /// in original C++ implementation
-    pub fn from_notes(notes: Vec<Pitch>, ref_chord: Option<Rc<CNChord>>) -> CNChord {
-        let ret = CNChord {
-            _pitches: notes.into_iter().sorted().dedup().collect(),
-        };
-        return ret;
+    pub fn from_notes(notes: Vec<Pitch>, dedup: bool) -> CNChord {
+        match dedup {
+            true => CNChord {
+                _pitches: notes.into_iter().sorted().dedup().collect(),
+            },
+            false => CNChord {
+                _pitches: notes.into_iter().sorted().collect(),
+            }
+        }
     }
 
     /// an integer representing 'note_set'; unique for different 'note_set's
@@ -172,13 +186,48 @@ impl CNChord {
         return self._pitches.len();
     }
 
+    pub fn apply_expansion(&self, expansion_map: &Vec<&usize>, total_size: usize) -> CNChord {
+        let mut ret = vec! {};
+        let mut counter: usize = 0;
+        for item in 1..(total_size + 1) {
+            ret.push(Pitch(self._pitches[counter].0));
+            if counter < expansion_map.len() && *expansion_map[counter] == item {
+                counter += 1;
+            }
+        }
+        let c = CNChord::from_notes(ret, false);
+        return c;
+    }
+
     pub fn diff(&self, chord: &CNChord) -> Result<ChordDiff, ParseCNChordError> {
         if self.t_size() == chord.t_size() {
             Ok(ChordDiff::new(
                 (0..(self.t_size().min(chord.t_size()))).map(|index| i16::from(chord._pitches[index].0) - i16::from(self._pitches[index].0)).collect()
             ))
+        } else if self.t_size() > chord.t_size() {
+            match chord.diff(self) {
+                Ok(p) => Ok(p.negate()),
+                Err(p) => Err(p)
+            }
         } else {
-            Err(ParseCNChordError { msg: format!("size difference: {} != {}", self.t_size(), chord.t_size()) })
+            let base = (1..(chord.t_size())).collect::<Vec<usize>>();
+            let base2 = base.iter().combinations(self.t_size() - 1).collect::<Vec<Vec<&usize>>>();
+            let selected_expansion_map = base2.iter().min_by_key(|expansion_map| {
+                let expanded_chord = self.apply_expansion(expansion_map, chord.t_size());
+                assert_eq!(expanded_chord.t_size(), chord.t_size(), "expansion_map: {}", iterable_to_str(expansion_map.iter()));
+                match chord.diff(&expanded_chord) {
+                    Ok(p) => p.sv,
+                    Err(p) => u16::MAX
+                }
+            });
+            match selected_expansion_map {
+                Some(p) => {
+                    let expanded_chord = self.apply_expansion(p, chord.t_size());
+                    assert_eq!(expanded_chord.t_size(), chord.t_size());
+                    chord.diff(&expanded_chord)
+                }
+                None => Err(ParseCNChordError { msg: String::from("Unknown Error") })
+            }
         }
     }
 }
@@ -188,7 +237,6 @@ impl fmt::Display for CNChord {
         write!(f, "{}", self._pitches.iter().map(|pitch: &Pitch| pitch.get_name()).join(", "))
     }
 }
-
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseCNChordError {
