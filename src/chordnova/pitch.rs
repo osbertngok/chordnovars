@@ -3,6 +3,7 @@ use crate::chordnova::pitchparser::Rule;
 use crate::chordnova::pitchparser::PitchParser;
 
 use std::fmt;
+use std::ops::{Add, Sub};
 use std::str::FromStr;
 
 pub enum Stepname {
@@ -132,6 +133,34 @@ pub fn convert_ps_to_step(midi_note_number: u8) -> (Stepname, Accidental, Option
 #[derive(Ord)]
 pub struct Pitch(pub u8);
 
+impl Add<u8> for Pitch {
+    type Output = Pitch;
+
+    fn add(self, rhs: u8) -> Self::Output {
+        Self {
+            0: self.0 + rhs
+        }
+    }
+}
+
+impl Sub<u8> for Pitch {
+    type Output = Pitch;
+
+    fn sub(self, rhs: u8) -> Self::Output {
+        Self {
+            0: self.0 - rhs
+        }
+    }
+}
+
+impl Copy for Pitch {}
+
+impl Clone for Pitch {
+    fn clone(&self) -> Self {
+        Pitch(self.0)
+    }
+}
+
 impl Pitch {
     pub fn convert_ps_to_step(&self) -> (Stepname, Accidental, Option<u8>) {
         convert_ps_to_step(self.0)
@@ -167,8 +196,8 @@ impl Pitch {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct ParsePitchError{
-    msg: String
+pub struct ParsePitchError {
+    msg: String,
 }
 
 impl fmt::Display for ParsePitchError {

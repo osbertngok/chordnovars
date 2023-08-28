@@ -134,6 +134,12 @@ pub struct CNChord {
     pub _pitches: Vec<Pitch>,
 }
 
+impl Clone for CNChord {
+    fn clone(&self) -> Self {
+        CNChord::from_notes(&self._pitches, false)
+    }
+}
+
 impl CNChord {
     pub fn new() -> Self {
         Self {
@@ -145,13 +151,13 @@ impl CNChord {
     /// See also
     ///     Chord(const vector<int>& _notes, double _chroma_old = 0.0);
     /// in original C++ implementation
-    pub fn from_notes(notes: Vec<Pitch>, dedup: bool) -> CNChord {
+    pub fn from_notes(notes: &Vec<Pitch>, dedup: bool) -> CNChord {
         match dedup {
             true => CNChord {
-                _pitches: notes.into_iter().sorted().dedup().collect(),
+                _pitches: notes.into_iter().sorted().dedup().map(|pitch| *pitch).collect(),
             },
             false => CNChord {
-                _pitches: notes.into_iter().sorted().collect(),
+                _pitches: notes.into_iter().sorted().map(|pitch| *pitch).collect(),
             }
         }
     }
@@ -177,8 +183,27 @@ impl CNChord {
     /// See Also:
     ///     void find_vec(Chord& new_chord, bool in_analyser = false, bool in_substitution = false);
     /// In original C++ Implementation
-    pub fn find_vec(&self, in_analyser: bool, in_substitution: bool) -> CNChord {
-        unimplemented!();
+    pub fn find_vec(&self, new_chord: &CNChord, in_analyser: bool, in_substitution: bool) -> Result<(CNChord, CNChord), ParseCNChordError> {
+        match in_substitution {
+            false => self.find_best_chord_pairs(new_chord),
+            true => {
+                // consider all possible inversions.
+                // Always invert the second chord
+                let base = itertools::iproduct!((0..2), (0..new_chord._pitches.len()));
+                match base.min_by_key(|inversion_map| {
+                    match new_chord.apply_inversion(inversion_map.0, inversion_map.1) {
+                        Ok(inverted_new_chord) => match self.diff(&inverted_new_chord) {
+                            Ok(p) => p.sv,
+                            Err(_) => u16::MAX
+                        },
+                        Err(_) => u16::MAX
+                    }
+                }) {
+                    Some(selected_inversion_map) => Ok(((*self).clone(), new_chord.apply_inversion(selected_inversion_map.0, selected_inversion_map.1).unwrap())),
+                    None => Err(ParseCNChordError { msg: String::from("Unknown Error") })
+                }
+            }
+        }
     }
 
     /// n; size of notes
@@ -186,7 +211,19 @@ impl CNChord {
         return self._pitches.len();
     }
 
+    pub fn apply_inversion(&self, octive: usize, inversion: usize) -> Result<CNChord, ParseCNChordError> {
+        // handling inversion
+        // handling octive
+        let octive_to_shift_due_to_inversion = match inversion {
+            0 => 0,
+            _ => (self._pitches[self._pitches.len() - 1].0 - self._pitches[inversion - 1].0 + 12 - 1) / 12
+        };
+        let new_pitches = self._pitches[inversion..self._pitches.len()].iter().cloned().chain(self._pitches[0..inversion].iter().map(|i| *i + 12 * octive_to_shift_due_to_inversion)).map(|item| item + u8::try_from(12 * octive).unwrap()).collect();
+        return Ok(CNChord::from_notes(&new_pitches, false));
+    }
+
     pub fn apply_expansion(&self, expansion_map: &Vec<&usize>, total_size: usize) -> CNChord {
+        // FIXME: return Result instead
         let mut ret = vec! {};
         let mut counter: usize = 0;
         for item in 1..(total_size + 1) {
@@ -195,8 +232,38 @@ impl CNChord {
                 counter += 1;
             }
         }
-        let c = CNChord::from_notes(ret, false);
+        let c = CNChord::from_notes(&ret, false);
         return c;
+    }
+
+    pub fn find_best_chord_pairs(&self, chord: &CNChord) -> Result<(CNChord, CNChord), ParseCNChordError> {
+        if self.t_size() == chord.t_size() {
+            return Ok(((*self).clone(), (*chord).clone()));
+        } else if self.t_size() > chord.t_size() {
+            match chord.find_best_chord_pairs(self) {
+                Ok((f, s)) => Ok((s, f)),
+                Err(e) => Err(e)
+            }
+        } else {
+            let base = (1..(chord.t_size())).collect::<Vec<usize>>();
+            let base2 = base.iter().combinations(self.t_size() - 1).collect::<Vec<Vec<&usize>>>();
+            let selected_expansion_map = base2.iter().min_by_key(|expansion_map| {
+                let expanded_chord = self.apply_expansion(expansion_map, chord.t_size());
+                assert_eq!(expanded_chord.t_size(), chord.t_size(), "expansion_map: {}", iterable_to_str(expansion_map.iter()));
+                match chord.diff(&expanded_chord) {
+                    Ok(p) => p.sv,
+                    Err(p) => u16::MAX
+                }
+            });
+            match selected_expansion_map {
+                Some(p) => {
+                    let expanded_chord = self.apply_expansion(p, chord.t_size());
+                    assert_eq!(expanded_chord.t_size(), chord.t_size());
+                    return Ok(((*self).clone(), expanded_chord));
+                }
+                None => Err(ParseCNChordError { msg: String::from("Unknown Error") })
+            }
+        }
     }
 
     pub fn diff(&self, chord: &CNChord) -> Result<ChordDiff, ParseCNChordError> {
@@ -271,5 +338,38 @@ impl FromStr for CNChord {
             }
             Err(e) => Err(ParseCNChordError { msg: String::from(e.to_string()) })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn formatting1() {
+        let c_major: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
+        assert_eq!(c_major.to_string(), "C4, E4, G4");
+    }
+
+    #[test]
+    fn formatting2() {
+        let c_dominant_7: CNChord = CNChord::from_str("C4 E4 G4 B-4").unwrap();
+        assert_eq!(c_dominant_7.to_string(), "C4, E4, G4, B-4");
+    }
+
+    #[test]
+    fn diff1() {
+        let c_major: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
+        let c_dominant_7: CNChord = CNChord::from_str("C4 E4 G4 B-4").unwrap();
+        assert_eq!(c_major.diff(&c_dominant_7).unwrap().to_string(), "<ChordDiff: [0, 0, 0, -3], sv: 3, norm: 3.00>");
+    }
+
+    #[test]
+    fn find_vec() {
+        let c_major: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
+        let f_major: CNChord = CNChord::from_str("F3 A3 C4").unwrap();
+        let result_tuple = c_major.find_vec(&f_major, false, true).unwrap();
+        assert_eq!(result_tuple.0.to_string(), "C4, E4, G4");
+        assert_eq!(result_tuple.1.to_string(), "C4, F4, A4");
     }
 }
