@@ -189,11 +189,11 @@ impl Pitch {
 
     pub fn get_nearest_pitch_by_pitch_class(&self, pitch_classes: &Vec<PitchClass>) -> Pitch {
         for (offset, direction) in iproduct!((0..12), vec![-1i8, 1i8]) {
-            println!("Trying {} | {}", direction, offset);
+            // println!("Trying {} | {}", direction, offset);
             let selected_pitch = *self + direction * offset;
             match (*pitch_classes).iter().position(|pitch_class| *pitch_class == selected_pitch.get_pitch_class()) {
                 Some(_) => {
-                    println!("{}, {:?} == {:?}", selected_pitch, selected_pitch.get_pitch_class(), pitch_classes);
+                    // println!("{}, {:?} == {:?}", selected_pitch, selected_pitch.get_pitch_class(), pitch_classes);
                     return selected_pitch;
                 }
                 None => {}
