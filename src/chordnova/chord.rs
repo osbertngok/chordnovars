@@ -16,20 +16,21 @@ use itertools::Itertools;
 use crate::chordnova::pitch::{ParsePitchError, Pitch, PitchClass};
 use crate::chordnova::util::iterable_to_str;
 
-
+#[allow(dead_code)]
 pub enum OverflowState {
     NoOverflow,
     Single,
     Total,
 }
 
-
+#[allow(dead_code)]
 pub enum OutputMode {
     Both,
     MidiOnly,
     TextOnly,
 }
 
+#[allow(dead_code)]
 pub struct CNChordExtendedData {
     /// Range of Movement, refers to Chord.vlmax
     pub _voice_leading_max: i64,
@@ -111,6 +112,7 @@ impl ChordDiff {
         (diff_vec.iter().map(|x| (*x as i32).pow(2)).sum::<i32>() as f64).sqrt()
     }
 
+    #[allow(dead_code)]
     fn negate(&self) -> ChordDiff {
         ChordDiff::new(self.diff_vec.iter().map(|x| -*x).collect::<Vec<i16>>())
     }
@@ -141,12 +143,12 @@ impl Clone for CNChord {
 }
 
 impl CNChord {
-    pub fn new() -> Self {
-        Self {
-            _pitches: Vec::new(),
-
-        }
-    }
+    // pub fn new() -> Self {
+    //     Self {
+    //         _pitches: Vec::new(),
+    //
+    //     }
+    // }
 
     /// See also
     ///     Chord(const vector<int>& _notes, double _chroma_old = 0.0);
@@ -165,6 +167,7 @@ impl CNChord {
     /// an integer representing 'note_set'; unique for different 'note_set's
     /// Assign a unique id for each pitch set (according to set theory)
     /// See also: https://web.mit.edu/music21/doc/moduleReference/moduleChord.html#music21.chord.Chord.chordTablesAddress
+    #[allow(dead_code)]
     pub fn set_id(&self) -> i64 {
         unimplemented!();
     }
@@ -179,6 +182,7 @@ impl CNChord {
     // }
 
     /// traverse some inversions
+    #[allow(dead_code)] // It is used in test cases
     pub fn find_vec_simple(&self, new_chord: &CNChord) -> Result<(CNChord, CNChord), ParseCNChordError> {
         // Corresponding to the original implementation in c++
         // 1. Consider all possible inversions.
@@ -200,6 +204,7 @@ impl CNChord {
     }
 
     /// traverse all inversions
+    #[allow(dead_code)]
     pub fn find_vec_by_pitch_class(&self, new_chord: &CNChord) -> Result<(CNChord, CNChord), ParseCNChordError> {
         // convert to pitch classes
         let pitch_classes = new_chord.get_pitch_classes();
@@ -221,7 +226,8 @@ impl CNChord {
     /// See Also:
     ///     void find_vec(Chord& new_chord, bool in_analyser = false, bool in_substitution = false);
     /// In original C++ Implementation
-    pub fn find_vec(&self, new_chord: &CNChord, in_analyser: bool, in_substitution: bool) -> Result<(CNChord, CNChord), ParseCNChordError> {
+    #[allow(dead_code)]
+    pub fn find_vec(&self, new_chord: &CNChord, _in_analyser: bool, in_substitution: bool) -> Result<(CNChord, CNChord), ParseCNChordError> {
         match in_substitution {
             false => self.find_best_chord_pairs(new_chord),
             true => self.find_vec_simple(new_chord),
@@ -280,7 +286,7 @@ impl CNChord {
                 assert_eq!(expanded_chord.t_size(), chord.t_size(), "expansion_map: {}", iterable_to_str(expansion_map.iter()));
                 match chord.diff(&expanded_chord) {
                     Ok(p) => p.sv,
-                    Err(p) => u16::MAX
+                    Err(_) => u16::MAX
                 }
             });
             match selected_expansion_map {
@@ -312,7 +318,7 @@ impl CNChord {
                 assert_eq!(expanded_chord.t_size(), chord.t_size(), "expansion_map: {}", iterable_to_str(expansion_map.iter()));
                 match chord.diff(&expanded_chord) {
                     Ok(p) => p.sv,
-                    Err(p) => u16::MAX
+                    Err(_) => u16::MAX
                 }
             });
             match selected_expansion_map {
@@ -355,8 +361,8 @@ impl FromStr for CNChord {
                                 })
                             }
                         }
-                        e => Err(ParseCNChordError {
-                            msg: String::from("Hi")
+                        rule => Err(ParseCNChordError {
+                            msg: String::from(format!("Unknown rule {:?}", rule))
                         })
                     },
                     None => Err(ParseCNChordError {

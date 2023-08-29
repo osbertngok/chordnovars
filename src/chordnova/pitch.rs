@@ -45,7 +45,7 @@ impl FromStr for Stepname {
             "E" => Ok(Stepname::E),
             "F" => Ok(Stepname::F),
             "G" => Ok(Stepname::G),
-            e => Err(ParseStepnameError {})
+            _ => Err(ParseStepnameError {})
         }
     }
 }
@@ -76,7 +76,7 @@ impl FromStr for Accidental {
             "#" => Ok(Accidental::Sharp),
             "-" => Ok(Accidental::Flat),
             "" => Ok(Accidental::Natural),
-            e => Err(ParseAccidentalError {})
+            _ => Err(ParseAccidentalError {})
         }
     }
 }
@@ -192,7 +192,7 @@ impl Pitch {
             println!("Trying {} | {}", direction, offset);
             let selected_pitch = *self + direction * offset;
             match (*pitch_classes).iter().position(|pitch_class| *pitch_class == selected_pitch.get_pitch_class()) {
-                Some(pos) => {
+                Some(_) => {
                     println!("{}, {:?} == {:?}", selected_pitch, selected_pitch.get_pitch_class(), pitch_classes);
                     return selected_pitch;
                 }
@@ -257,8 +257,8 @@ impl FromStr for Pitch {
                             };
                             Ok(Pitch::from_stepname(stepname, accidental, octive))
                         }
-                        e => Err(ParsePitchError {
-                            msg: String::from("")
+                        rule => Err(ParsePitchError {
+                            msg: String::from(format!("Unknown rule {:?}", rule))
                         })
                     },
                     None => Err(ParsePitchError {
@@ -266,8 +266,8 @@ impl FromStr for Pitch {
                     })
                 }
             }
-            Err(e) => Err(ParsePitchError {
-                msg: String::from("")
+            Err(_) => Err(ParsePitchError {
+                msg: String::from("Unknown Parse Pitch Error")
             })
         }
     }
