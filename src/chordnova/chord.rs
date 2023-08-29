@@ -13,7 +13,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::rc::Rc;
 use itertools::Itertools;
-use crate::chordnova::pitch::{ParsePitchError, Pitch};
+use crate::chordnova::pitch::{ParsePitchError, Pitch, PitchClass};
 use crate::chordnova::util::iterable_to_str;
 
 
@@ -178,6 +178,42 @@ impl CNChord {
     //     return self._voice_leading_max;
     // }
 
+    pub fn find_vec_simple(&self, new_chord: &CNChord) -> Result<(CNChord, CNChord), ParseCNChordError> {
+        // Corresponding to the original implementation in c++
+        // 1. Consider all possible inversions.
+        // 2. Consider two octives
+        // 3. Always invert the second chord
+        let base = itertools::iproduct!((-1i8..1i8), (0..new_chord._pitches.len()));
+        match base.min_by_key(|inversion_map| {
+            match new_chord.apply_inversion(inversion_map.0, inversion_map.1) {
+                Ok(inverted_new_chord) => match self.diff(&inverted_new_chord) {
+                    Ok(p) => p.sv,
+                    Err(_) => u16::MAX
+                },
+                Err(_) => u16::MAX
+            }
+        }) {
+            Some(selected_inversion_map) => Ok(((*self).clone(), new_chord.apply_inversion(selected_inversion_map.0, selected_inversion_map.1).unwrap())),
+            None => Err(ParseCNChordError { msg: String::from("Unknown Error") })
+        }
+    }
+
+    pub fn find_vec_by_pitch_class(&self, new_chord: &CNChord) -> Result<(CNChord, CNChord), ParseCNChordError> {
+        // convert to pitch classes
+        let pitch_classes = new_chord.get_pitch_classes();
+        let mut unused_pitch_classes = pitch_classes.to_vec();
+        let mut new_pitches = vec! {};
+        for pitch in &self._pitches {
+            let new_pitch = pitch.get_nearest_pitch_by_pitch_class(&unused_pitch_classes);
+            new_pitches.push(new_pitch);
+            let pos = unused_pitch_classes.iter().position(|unused_pitch_class| *unused_pitch_class == new_pitch.get_pitch_class()).unwrap();
+            unused_pitch_classes.remove(pos);
+        }
+        let new_chord = CNChord::from_notes(&new_pitches, false);
+        println!("{}", new_chord);
+        Ok(((*self).clone(), new_chord))
+    }
+
     /// interface of '_find_vec'
     ///
     /// See Also:
@@ -186,24 +222,13 @@ impl CNChord {
     pub fn find_vec(&self, new_chord: &CNChord, in_analyser: bool, in_substitution: bool) -> Result<(CNChord, CNChord), ParseCNChordError> {
         match in_substitution {
             false => self.find_best_chord_pairs(new_chord),
-            true => {
-                // consider all possible inversions.
-                // Always invert the second chord
-                let base = itertools::iproduct!((0..2), (0..new_chord._pitches.len()));
-                match base.min_by_key(|inversion_map| {
-                    match new_chord.apply_inversion(inversion_map.0, inversion_map.1) {
-                        Ok(inverted_new_chord) => match self.diff(&inverted_new_chord) {
-                            Ok(p) => p.sv,
-                            Err(_) => u16::MAX
-                        },
-                        Err(_) => u16::MAX
-                    }
-                }) {
-                    Some(selected_inversion_map) => Ok(((*self).clone(), new_chord.apply_inversion(selected_inversion_map.0, selected_inversion_map.1).unwrap())),
-                    None => Err(ParseCNChordError { msg: String::from("Unknown Error") })
-                }
-            }
+            true => self.find_vec_simple(new_chord),
+            // true => self.find_vec_by_pitch_class(new_chord)
         }
+    }
+
+    pub fn get_pitch_classes(&self) -> Vec<PitchClass> {
+        self._pitches.iter().map(|pitch| pitch.get_pitch_class()).dedup().collect::<Vec<PitchClass>>()
     }
 
     /// n; size of notes
@@ -211,14 +236,14 @@ impl CNChord {
         return self._pitches.len();
     }
 
-    pub fn apply_inversion(&self, octive: usize, inversion: usize) -> Result<CNChord, ParseCNChordError> {
+    pub fn apply_inversion(&self, octive: i8, inversion: usize) -> Result<CNChord, ParseCNChordError> {
         // handling inversion
         // handling octive
         let octive_to_shift_due_to_inversion = match inversion {
             0 => 0,
             _ => (self._pitches[self._pitches.len() - 1].0 - self._pitches[inversion - 1].0 + 12 - 1) / 12
         };
-        let new_pitches = self._pitches[inversion..self._pitches.len()].iter().cloned().chain(self._pitches[0..inversion].iter().map(|i| *i + 12 * octive_to_shift_due_to_inversion)).map(|item| item + u8::try_from(12 * octive).unwrap()).collect();
+        let new_pitches = self._pitches[inversion..self._pitches.len()].iter().cloned().chain(self._pitches[0..inversion].iter().map(|i| *i + i8::try_from(12 * octive_to_shift_due_to_inversion).unwrap())).map(|item| item + i8::try_from(12 * octive).unwrap()).collect();
         return Ok(CNChord::from_notes(&new_pitches, false));
     }
 
@@ -365,11 +390,38 @@ mod tests {
     }
 
     #[test]
-    fn find_vec() {
+    fn find_vec1_1() {
         let c_major: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
         let f_major: CNChord = CNChord::from_str("F3 A3 C4").unwrap();
-        let result_tuple = c_major.find_vec(&f_major, false, true).unwrap();
+        let result_tuple = c_major.find_vec_simple(&f_major).unwrap();
         assert_eq!(result_tuple.0.to_string(), "C4, E4, G4");
         assert_eq!(result_tuple.1.to_string(), "C4, F4, A4");
+    }
+
+    #[test]
+    fn find_vec1_2() {
+        let c_major: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
+        let f_major: CNChord = CNChord::from_str("F3 A3 C4").unwrap();
+        let result_tuple = c_major.find_vec_by_pitch_class(&f_major).unwrap();
+        assert_eq!(result_tuple.0.to_string(), "C4, E4, G4");
+        assert_eq!(result_tuple.1.to_string(), "C4, F4, A4");
+    }
+
+    #[test]
+    fn find_vec2_1() {
+        let b_diminished: CNChord = CNChord::from_str("B3 D4 F4").unwrap();
+        let g_major: CNChord = CNChord::from_str("G4 B4 D5").unwrap();
+        let result_tuple = b_diminished.find_vec_simple(&g_major).unwrap();
+        assert_eq!(result_tuple.0.to_string(), "B3, D4, F4");
+        assert_eq!(result_tuple.1.to_string(), "B3, D4, G4");
+    }
+
+    #[test]
+    fn find_vec2_2() {
+        let b_diminished: CNChord = CNChord::from_str("B3 D4 F4").unwrap();
+        let g_major: CNChord = CNChord::from_str("G4 B4 D5").unwrap();
+        let result_tuple = b_diminished.find_vec_by_pitch_class(&g_major).unwrap();
+        assert_eq!(result_tuple.0.to_string(), "B3, D4, F4");
+        assert_eq!(result_tuple.1.to_string(), "B3, D4, G4");
     }
 }

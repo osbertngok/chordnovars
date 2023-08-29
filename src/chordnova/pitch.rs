@@ -5,6 +5,7 @@ use crate::chordnova::pitchparser::PitchParser;
 use std::fmt;
 use std::ops::{Add, Sub};
 use std::str::FromStr;
+use itertools::iproduct;
 
 pub enum Stepname {
     C,
@@ -80,7 +81,15 @@ impl FromStr for Accidental {
     }
 }
 
+#[derive(Debug)]
+#[derive(Clone)]
 pub struct PitchClass(u8);
+
+impl PartialEq for PitchClass {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
 
 
 impl PitchClass {
@@ -133,22 +142,22 @@ pub fn convert_ps_to_step(midi_note_number: u8) -> (Stepname, Accidental, Option
 #[derive(Ord)]
 pub struct Pitch(pub u8);
 
-impl Add<u8> for Pitch {
+impl Add<i8> for Pitch {
     type Output = Pitch;
 
-    fn add(self, rhs: u8) -> Self::Output {
+    fn add(self, rhs: i8) -> Self::Output {
         Self {
-            0: self.0 + rhs
+            0: u8::try_from(i8::try_from(self.0).unwrap() + rhs).unwrap()
         }
     }
 }
 
-impl Sub<u8> for Pitch {
+impl Sub<i8> for Pitch {
     type Output = Pitch;
 
-    fn sub(self, rhs: u8) -> Self::Output {
+    fn sub(self, rhs: i8) -> Self::Output {
         Self {
-            0: self.0 - rhs
+            0: u8::try_from(i8::try_from(self.0).unwrap() - rhs).unwrap()
         }
     }
 }
@@ -172,6 +181,26 @@ impl Pitch {
             Some(t) => t.to_string(),
             None => String::new()
         })
+    }
+
+    pub fn get_pitch_class(&self) -> PitchClass {
+        PitchClass(self.0 % 12)
+    }
+
+    pub fn get_nearest_pitch_by_pitch_class(&self, pitch_classes: &Vec<PitchClass>) -> Pitch {
+        for (offset, direction) in iproduct!((0..12), vec![-1i8, 1i8]) {
+            println!("Trying {} | {}", direction, offset);
+            let selected_pitch = *self + direction * offset;
+            match (*pitch_classes).iter().position(|pitch_class| *pitch_class == selected_pitch.get_pitch_class()) {
+                Some(pos) => {
+                    println!("{}, {:?} == {:?}", selected_pitch, selected_pitch.get_pitch_class(), pitch_classes);
+                    return selected_pitch;
+                }
+                None => {}
+            }
+            continue;
+        }
+        unreachable!()
     }
 
     pub fn from_stepname(stepname: Stepname, accidental: Accidental, octive: Option<u8>) -> Pitch {
