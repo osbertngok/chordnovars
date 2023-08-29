@@ -178,6 +178,7 @@ impl CNChord {
     //     return self._voice_leading_max;
     // }
 
+    /// traverse some inversions
     pub fn find_vec_simple(&self, new_chord: &CNChord) -> Result<(CNChord, CNChord), ParseCNChordError> {
         // Corresponding to the original implementation in c++
         // 1. Consider all possible inversions.
@@ -193,11 +194,12 @@ impl CNChord {
                 Err(_) => u16::MAX
             }
         }) {
-            Some(selected_inversion_map) => Ok(((*self).clone(), new_chord.apply_inversion(selected_inversion_map.0, selected_inversion_map.1).unwrap())),
+            Some(selected_inversion_map) => self.find_best_chord_pairs(&new_chord.apply_inversion(selected_inversion_map.0, selected_inversion_map.1).unwrap()),
             None => Err(ParseCNChordError { msg: String::from("Unknown Error") })
         }
     }
 
+    /// traverse all inversions
     pub fn find_vec_by_pitch_class(&self, new_chord: &CNChord) -> Result<(CNChord, CNChord), ParseCNChordError> {
         // convert to pitch classes
         let pitch_classes = new_chord.get_pitch_classes();
@@ -261,6 +263,7 @@ impl CNChord {
         return c;
     }
 
+    /// traverse all combinations
     pub fn find_best_chord_pairs(&self, chord: &CNChord) -> Result<(CNChord, CNChord), ParseCNChordError> {
         if self.t_size() == chord.t_size() {
             return Ok(((*self).clone(), (*chord).clone()));
@@ -284,7 +287,7 @@ impl CNChord {
                 Some(p) => {
                     let expanded_chord = self.apply_expansion(p, chord.t_size());
                     assert_eq!(expanded_chord.t_size(), chord.t_size());
-                    return Ok(((*self).clone(), expanded_chord));
+                    return Ok((expanded_chord, (*chord).clone()));
                 }
                 None => Err(ParseCNChordError { msg: String::from("Unknown Error") })
             }
@@ -390,6 +393,15 @@ mod tests {
     }
 
     #[test]
+    fn find_best_chord_pairs_1() {
+        let c_major: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
+        let c_dominant_7: CNChord = CNChord::from_str("C4 E4 G4 B-4").unwrap();
+        let result_tuple = c_major.find_best_chord_pairs(&c_dominant_7).unwrap();
+        assert_eq!(result_tuple.0.to_string(), "C4, E4, G4, G4");
+        assert_eq!(result_tuple.1.to_string(), "C4, E4, G4, B-4");
+    }
+
+    #[test]
     fn find_vec1_1() {
         let c_major: CNChord = CNChord::from_str("C4 E4 G4").unwrap();
         let f_major: CNChord = CNChord::from_str("F3 A3 C4").unwrap();
@@ -423,5 +435,32 @@ mod tests {
         let result_tuple = b_diminished.find_vec_by_pitch_class(&g_major).unwrap();
         assert_eq!(result_tuple.0.to_string(), "B3, D4, F4");
         assert_eq!(result_tuple.1.to_string(), "B3, D4, G4");
+    }
+
+    #[test]
+    fn find_vec3_2() {
+        let c_major: CNChord = CNChord::from_str("C3 G3 E4 C5").unwrap();
+        let c_major_seventh: CNChord = CNChord::from_str("C3 E3 G3 B3").unwrap();
+        let result_tuple = c_major.find_vec_by_pitch_class(&c_major_seventh).unwrap();
+        assert_eq!(result_tuple.0.to_string(), "C3, G3, E4, C5");
+        assert_eq!(result_tuple.1.to_string(), "C3, G3, E4, B4");
+    }
+
+    #[test]
+    fn find_vec4_1() {
+        let c_major: CNChord = CNChord::from_str("C3 E3 G3").unwrap();
+        let c_major_seventh: CNChord = CNChord::from_str("C3 E3 G3 B3").unwrap();
+        let result_tuple = c_major.find_vec_simple(&c_major_seventh).unwrap();
+        assert_eq!(result_tuple.0.to_string(), "C3, C3, E3, G3");
+        assert_eq!(result_tuple.1.to_string(), "B2, C3, E3, G3");
+    }
+
+    #[test]
+    fn find_vec4_2() {
+        let c_major: CNChord = CNChord::from_str("C3 E3 G3").unwrap();
+        let c_major_seventh: CNChord = CNChord::from_str("C3 E3 G3 B3").unwrap();
+        let result_tuple = c_major.find_vec_by_pitch_class(&c_major_seventh).unwrap();
+        assert_eq!(result_tuple.0.to_string(), "C3, C3, E3, G3");
+        assert_eq!(result_tuple.1.to_string(), "B2, C3, E3, G3");
     }
 }
