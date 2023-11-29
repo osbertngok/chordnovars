@@ -1,1 +1,8 @@
 # chordnovars
+
+
+## Build
+
+```
+cargo build
+```
