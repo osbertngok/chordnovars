@@ -302,6 +302,8 @@ impl CNChord {
 
     pub fn diff(&self, chord: &CNChord) -> Result<ChordDiff, ParseCNChordError> {
         if self.t_size() == chord.t_size() {
+            /// Return the diff of two chord with the same size pitch by pitch.
+            /// It does not return a score - upper function can still choose what to evaluate based on need
             Ok(ChordDiff::new(
                 (0..(self.t_size().min(chord.t_size()))).map(|index| i16::from(chord._pitches[index].0) - i16::from(self._pitches[index].0)).collect()
             ))
