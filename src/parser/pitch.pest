@@ -1,0 +1,17 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+integer = @{ "_"? ~ ASCII_DIGIT+ }
+
+STEPNAME = { "A" | "B" | "C" | "D" | "E" | "F" | "G"}
+ACCIDENTAL = {"#" | "-" | ""}
+OCTIVE = { integer | ""}
+
+PITCH = {STEPNAME ~ ACCIDENTAL ~ OCTIVE}
+
+// Pest use PEG, not CFG (See https://stackoverflow.com/questions/5501074/what-are-the-differences-between-pegs-and-cfgs)
+PITCHES = {
+  PITCH ~ (PITCH)* |
+  PITCH |
+  ""
+}
+
+FULL_PITCHES = _{ SOI ~ PITCHES ~ EOI }
