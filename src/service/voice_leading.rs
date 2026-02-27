@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::constant::ET_SIZE;
 use crate::model::ordered_chord::OrderedChord;
 use crate::model::pitch::Pitch;
@@ -8,7 +10,7 @@ use crate::utility::combinatorics::expansion_count;
 /// Signed semitone movement per voice and sum of absolute distances.
 ///
 /// Port of `VoiceLeadingResult` from `ChordNova/src/include/service/voiceleading.h`.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct VoiceLeadingResult {
     /// Signed semitone movement per voice (positive = ascending).
     pub vec: Vec<i32>,

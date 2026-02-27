@@ -2,6 +2,8 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
+
 use crate::model::pitch::Pitch;
 use crate::model::pitch_class::PitchClass;
 use crate::model::pitch_iterable::PitchIterable;
@@ -87,6 +89,20 @@ impl PitchIterable for OrderedChord {
 
     fn find_root(&self) -> Option<PitchClass> {
         self.to_set().find_root()
+    }
+}
+
+impl Serialize for OrderedChord {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let midi_numbers: Vec<u8> = self.pitches.iter().map(|p| p.get_number()).collect();
+        midi_numbers.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for OrderedChord {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let midi_numbers = Vec::<u8>::deserialize(deserializer)?;
+        Ok(OrderedChord::new(midi_numbers.into_iter().map(Pitch::new).collect()))
     }
 }
 

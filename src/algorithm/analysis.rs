@@ -6,6 +6,7 @@ use crate::service::voice_leading::{find_voice_leading, VoiceLeadingResult};
 /// Result of analysing a two-chord progression (ante → post).
 ///
 /// Port of `AnalysisResult` from `ChordNova/src/include/algorithm/analysis.h`.
+#[derive(serde::Serialize)]
 pub struct AnalysisResult {
     pub ante_stats: OrderedChordStatistics,
     pub post_stats: OrderedChordStatistics,

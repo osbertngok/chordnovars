@@ -12,7 +12,7 @@ use crate::service::voice_leading::find_voice_leading_substitution;
 /// A single substitution result entry.
 ///
 /// Port of `SubstitutionEntry` from `ChordNova/src/include/algorithm/substitution.h`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SubstitutionEntry {
     pub chord: OrderedChord,
     pub stats: BigramChordStatistics,
@@ -21,13 +21,14 @@ pub struct SubstitutionEntry {
 }
 
 /// Paired substitution entry for BothChords mode.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SubstitutionPair {
     pub ante: SubstitutionEntry,
     pub post: SubstitutionEntry,
 }
 
 /// Result of a substitution search.
+#[derive(serde::Serialize)]
 pub struct SubstitutionResult {
     /// Postchord/Antechord mode: single-chord substitutes.
     pub entries: Vec<SubstitutionEntry>,

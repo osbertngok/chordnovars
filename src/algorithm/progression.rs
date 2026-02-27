@@ -17,6 +17,7 @@ use crate::utility::mixed_radix::MixedRadixRange;
 /// Result of a single-step progression generation.
 ///
 /// Port of `ProgressionResult` from `ChordNova/src/include/algorithm/progression.h`.
+#[derive(serde::Serialize)]
 pub struct ProgressionResult {
     /// All valid candidate chords with bigram statistics.
     pub candidates: Vec<CandidateEntry>,

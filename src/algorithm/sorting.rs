@@ -5,7 +5,7 @@ use crate::model::pitch_iterable::PitchIterable;
 /// A candidate chord with its computed bigram statistics.
 ///
 /// Port of `CandidateEntry` from `ChordNova/src/include/algorithm/sorting.h`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct CandidateEntry {
     pub chord: OrderedChord,
     pub stats: BigramChordStatistics,

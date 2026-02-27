@@ -3,6 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use once_cell::sync::Lazy;
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
 use crate::constant::ET_SIZE;
 
@@ -93,6 +94,24 @@ impl PitchClass {
         let et = ET_SIZE as i32;
         let v = self.0 as i32 % et;
         Chroma(et / 2 - ((et / 2 - 1) * v + et / 2) % et)
+    }
+}
+
+impl Serialize for PitchClass {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_u8(self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for PitchClass {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = u8::deserialize(deserializer)?;
+        if value >= ET_SIZE as u8 {
+            return Err(serde::de::Error::custom(format!(
+                "pitch class must be 0-11, got {}", value
+            )));
+        }
+        Ok(PitchClass(value))
     }
 }
 

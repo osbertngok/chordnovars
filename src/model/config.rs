@@ -1,9 +1,11 @@
+use serde::{Serialize, Deserialize};
+
 use crate::constant::ET_SIZE;
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
 /// Output format mode.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum OutputMode {
     /// Output both text and MIDI files.
     #[default]
@@ -15,7 +17,7 @@ pub enum OutputMode {
 }
 
 /// Deduplication mode for generated chords.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum UniqueMode {
     /// No deduplication.
     #[default]
@@ -27,7 +29,7 @@ pub enum UniqueMode {
 }
 
 /// Voice alignment validation mode.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum AlignMode {
     /// Validate by interval range constraints.
     Interval,
@@ -39,7 +41,7 @@ pub enum AlignMode {
 }
 
 /// Voice-leading direction constraint mode.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum VLSetting {
     /// Direction counts as percentage of total voices.
     Percentage,
@@ -51,7 +53,7 @@ pub enum VLSetting {
 }
 
 /// Which chord(s) to substitute in chord substitution mode.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum SubstituteObj {
     /// Substitute the post-chord only.
     #[default]
@@ -65,7 +67,7 @@ pub enum SubstituteObj {
 // ── Constraint structs ────────────────────────────────────────────────────────
 
 /// Interval constraint data for exclusion rules.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntervalConstraint {
     pub interval: i32,
     pub octave_min: i32,
@@ -75,7 +77,7 @@ pub struct IntervalConstraint {
 }
 
 /// Voice-leading movement constraints.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceLeadingConstraints {
     pub vl_min: i32,
     pub vl_max: i32,
@@ -105,7 +107,7 @@ impl Default for VoiceLeadingConstraints {
 }
 
 /// Pitch range constraints.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RangeConstraints {
     pub lowest: i32,
     pub highest: i32,
@@ -141,7 +143,7 @@ impl Default for RangeConstraints {
 }
 
 /// Harmonic/bigram statistic range constraints.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HarmonicConstraints {
     pub k_min: f64,
     pub k_max: f64,
@@ -189,7 +191,7 @@ impl Default for HarmonicConstraints {
 }
 
 /// Alignment/interval spacing constraints.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlignmentConfig {
     pub align_mode: AlignMode,
     pub i_min: i32,
@@ -213,7 +215,7 @@ impl Default for AlignmentConfig {
 }
 
 /// Note/root/interval exclusion rules.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ExclusionConfig {
     pub enabled: bool,
     pub exclusion_notes: Vec<i32>,
@@ -222,7 +224,7 @@ pub struct ExclusionConfig {
 }
 
 /// Pedal note constraints.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PedalConfig {
     pub enabled: bool,
     pub pedal_notes: Vec<i32>,
@@ -248,13 +250,13 @@ impl Default for PedalConfig {
 }
 
 /// Deduplication settings.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UniquenessConfig {
     pub unique_mode: UniqueMode,
 }
 
 /// Overall scale constraint (pitch class filter).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScaleConfig {
     pub overall_scale: Vec<i32>,
 }
@@ -268,7 +270,7 @@ impl Default for ScaleConfig {
 }
 
 /// Extended similarity checking configuration.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SimilarityConfig {
     pub enabled: bool,
     pub sim_period: Vec<i32>,
@@ -277,7 +279,7 @@ pub struct SimilarityConfig {
 }
 
 /// Root movement constraint.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RootMovementConfig {
     pub enabled: bool,
     /// Priority for each root movement 0–6. -1 = disabled.
@@ -285,7 +287,7 @@ pub struct RootMovementConfig {
 }
 
 /// Bass note availability constraints.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BassConfig {
     pub bass_avail: Vec<i32>,
 }
@@ -299,20 +301,20 @@ impl Default for BassConfig {
 }
 
 /// Chord library (database) configuration.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChordLibraryConfig {
     pub chord_library: Vec<i32>,
 }
 
 /// Sort order configuration.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SortConfig {
     /// Sort string read right-to-left; '+' suffix = ascending.
     pub sort_order: String,
 }
 
 /// Aggregated progression generation configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProgressionConfig {
     pub voice_leading: VoiceLeadingConstraints,
     pub range: RangeConstraints,

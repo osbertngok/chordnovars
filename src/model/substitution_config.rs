@@ -1,7 +1,9 @@
+use serde::{Serialize, Deserialize};
+
 use crate::model::config::SubstituteObj;
 
 /// Per-parameter substitution tolerance: center value, radius, and computed min/max.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ParamTolerance {
     /// Reference value (computed or reset).
     pub center: f64,
@@ -16,7 +18,7 @@ pub struct ParamTolerance {
 }
 
 /// Configuration for chord substitution search.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubstitutionConfig {
     /// Which chord(s) to substitute.
     pub object: SubstituteObj,

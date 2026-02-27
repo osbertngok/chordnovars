@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::constant::ET_SIZE;
 use crate::model::ordered_chord::OrderedChord;
 use crate::model::pitch_class::PitchClass;
@@ -5,7 +7,7 @@ use crate::model::pitch_iterable::PitchIterable;
 use crate::utility::general::{NOTE_POS, normal_form};
 
 /// Calculated properties of a single chord.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderedChordStatistics {
     /// Number of pitches (n).
     pub num_of_pitches: usize,

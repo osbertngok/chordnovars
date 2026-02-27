@@ -1,10 +1,12 @@
+use serde::{Serialize, Deserialize};
+
 use crate::constant::ET_SIZE;
 use crate::model::chord_statistics::OrderedChordStatistics;
 use crate::model::ordered_chord::OrderedChord;
 use crate::model::pitch_iterable::PitchIterable;
 use crate::utility::general::{set_complement, set_intersect, set_union, sign};
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub enum OverflowState {
     #[default]
     NoOverflow,
@@ -12,7 +14,7 @@ pub enum OverflowState {
     Total,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BigramChordStatistics {
     /// Average Circle of Fifths position of unique pitch classes (kk).
     pub chroma_old: f64,
