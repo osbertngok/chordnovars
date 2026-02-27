@@ -7,6 +7,7 @@ This is a full Rust rewrite of the C++ `revamp-phase-2` branch of ChordNova, loc
 - **C++ source:** ~10k lines of source + ~3.6k lines of tests across 264 test cases
 - **Rust repo:** This repo — `rust-port` branch
 - **Goal:** Full feature parity with C++ revamp, idiomatic Rust
+- **Status: COMPLETE** — All 15 phases implemented, 112 tests passing
 
 ## What Was Kept vs Rewritten
 
@@ -174,7 +175,7 @@ Functions: `normal_form()`, `set_intersect()`, `set_union()`, `set_complement()`
 
 ---
 
-## Remaining Phases (to implement)
+## Completed Phase Details
 
 ### Phase 6: OrderedChordStatistics
 **File:** `src/model/chord_statistics.rs`
