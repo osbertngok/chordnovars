@@ -23,6 +23,10 @@ pub struct ValidationContext<'a> {
     /// Lazily-computed statistics for the candidate chord.
     pub candidate_stats: Option<OrderedChordStatistics>,
 
+    /// Cached per-voice chroma values (sorted, deduped) for the candidate.
+    /// Computed once by Stage 13 (span), reused by Stage 14 (q_indicator).
+    pub candidate_single_chroma: Option<Vec<i32>>,
+
     /// Set IDs already seen (RemoveDupType uniqueness).
     pub rec_ids: &'a mut HashSet<i32>,
 
@@ -45,6 +49,24 @@ impl<'a> ValidationContext<'a> {
             self.candidate_stats = Some(calculate_statistics(chord));
         }
         self.candidate_stats.as_ref().unwrap()
+    }
+
+    /// Compute and cache per-voice chroma (sorted, deduped).
+    /// Used by both span (Stage 13) and q_indicator (Stage 14).
+    fn ensure_chroma(&mut self, chord: &OrderedChord) -> &[i32] {
+        if self.candidate_single_chroma.is_none() {
+            let pitches = chord.get_pitches();
+            let mut chroma: Vec<i32> = pitches.iter()
+                .map(|p| {
+                    let midi = p.get_number() as i32;
+                    6 - (5 * (midi % ET_SIZE as i32) + 6).rem_euclid(ET_SIZE as i32)
+                })
+                .collect();
+            chroma.sort_unstable();
+            chroma.dedup();
+            self.candidate_single_chroma = Some(chroma);
+        }
+        self.candidate_single_chroma.as_ref().unwrap()
     }
 }
 
@@ -412,20 +434,9 @@ pub fn validate_similarity(ctx: &mut ValidationContext, chord: &OrderedChord) ->
 /// Stage 13: Circle of Fifths span and super-span constraints.
 pub fn validate_span(ctx: &mut ValidationContext, chord: &OrderedChord) -> bool {
     let harmonic = &ctx.config.harmonic;
-    let pitches = chord.get_pitches();
 
-    // Compute per-voice chroma values
-    let curr_single_chroma: Vec<i32> = pitches.iter()
-        .map(|p| {
-            let midi = p.get_number() as i32;
-            6 - (5 * (midi % ET_SIZE as i32) + 6).rem_euclid(ET_SIZE as i32)
-        })
-        .collect();
-
-    // Sorted, deduplicated chroma
-    let mut sorted_chroma = curr_single_chroma.clone();
-    sorted_chroma.sort_unstable();
-    sorted_chroma.dedup();
+    // Use cached chroma (sorted, deduped)
+    let sorted_chroma = ctx.ensure_chroma(chord).to_vec();
 
     let n = sorted_chroma.len() as i32;
     if n <= 1 {
@@ -463,17 +474,8 @@ pub fn validate_q_indicator(ctx: &mut ValidationContext, chord: &OrderedChord) -
         (stats.tension, stats.num_of_pitches)
     };
 
-    let pitches = chord.get_pitches();
-    let curr_single_chroma: Vec<i32> = pitches.iter()
-        .map(|p| {
-            let midi = p.get_number() as i32;
-            6 - (5 * (midi % ET_SIZE as i32) + 6).rem_euclid(ET_SIZE as i32)
-        })
-        .collect();
-
-    let mut sorted_unique = curr_single_chroma.clone();
-    sorted_unique.sort_unstable();
-    sorted_unique.dedup();
+    // Use cached chroma (sorted, deduped)
+    let sorted_unique = ctx.ensure_chroma(chord).to_vec();
 
     let sum: i32 = sorted_unique.iter().sum();
     let mut curr_chroma_old = (sum as f64 / sorted_unique.len() as f64 * 100.0).floor() / 100.0;
@@ -532,25 +534,30 @@ pub struct ChordValidationPipeline {
 }
 
 impl ChordValidationPipeline {
-    /// Constructs the default 15-stage pipeline.
+    /// Constructs the optimized pipeline.
+    ///
+    /// Stages removed (now done as early pruning in the mutation loop):
+    /// - Range (Stage 2): checked during pitch construction
+    /// - Cardinality (Stage 6): m is deterministic from expansion; n checked early
+    /// - Scale membership (Stage 8): checked during pitch construction
+    ///
+    /// The chord library subset of bass_and_library (Stage 9) is also checked early,
+    /// but bass_avail and alignment checks still require the full pipeline.
     pub fn new() -> Self {
         ChordValidationPipeline {
             validators: vec![
-                validate_monotonicity,
-                validate_range,
-                validate_alignment,
-                validate_exclusion,
-                validate_pedal,
-                validate_cardinality,
-                validate_single_chord_stats,
-                validate_scale_membership,
-                validate_bass_and_library,
-                validate_uniqueness,
-                validate_voice_leading,
-                validate_similarity,
-                validate_span,
-                validate_q_indicator,
-                validate_vec_uniqueness,
+                validate_monotonicity,       // Stage 1
+                validate_alignment,          // Stage 3
+                validate_exclusion,          // Stage 4
+                validate_pedal,              // Stage 5
+                validate_single_chord_stats, // Stage 7
+                validate_bass_and_library,   // Stage 9 (bass_avail only; library checked early)
+                validate_uniqueness,         // Stage 10
+                validate_voice_leading,      // Stage 11
+                validate_similarity,         // Stage 12
+                validate_span,               // Stage 13
+                validate_q_indicator,        // Stage 14
+                validate_vec_uniqueness,     // Stage 15
             ],
         }
     }
@@ -593,6 +600,7 @@ mod tests {
             prev_stats,
             vl_result: VoiceLeadingResult::default(),
             candidate_stats: None,
+            candidate_single_chroma: None,
             rec_ids,
             vec_ids,
             prev_single_chroma: &[],
@@ -654,7 +662,9 @@ mod tests {
     }
 
     #[test]
-    fn pipeline_rejects_out_of_range() {
+    fn range_rejection_via_validate_range() {
+        // Range checking is now done early in the mutation loop (progression.rs),
+        // but validate_range still works standalone for direct callers.
         use crate::model::config::RangeConstraints;
         let prev = make_chord(&[60, 64, 67]);
         let prev_stats = calculate_statistics(&prev);
@@ -666,7 +676,6 @@ mod tests {
         let mut ctx = make_context(&config, &prev, &prev_stats, &mut rec_ids, &mut vec_ids);
 
         let candidate = make_chord(&[60, 64, 67]); // G4=67 > highest=65
-        let pipeline = ChordValidationPipeline::new();
-        assert!(!pipeline.validate(&mut ctx, &candidate));
+        assert!(!validate_range(&mut ctx, &candidate));
     }
 }

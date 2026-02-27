@@ -2,11 +2,13 @@ use std::collections::HashSet;
 
 use crate::algorithm::sorting::{sort_candidates, CandidateEntry};
 use crate::algorithm::validation::{ChordValidationPipeline, ValidationContext};
+use crate::constant::ET_SIZE;
 use crate::model::bigram_statistics::calculate_bigram_statistics;
 use crate::model::chord_statistics::calculate_statistics;
 use crate::model::config::{ProgressionConfig, UniqueMode};
 use crate::model::ordered_chord::OrderedChord;
 use crate::model::pitch::Pitch;
+use crate::model::pitch_iterable::PitchIterable;
 use crate::service::expansion::expand_single;
 use crate::service::voice_leading::VoiceLeadingResult;
 use crate::utility::combinatorics::expansion_count;
@@ -52,6 +54,24 @@ pub fn generate_single(
     let mut vec_ids: HashSet<i64> = HashSet::new();
     let mut dup_ids: HashSet<Vec<u8>> = HashSet::new();
 
+    // Pre-compute scale set for early filtering (avoid per-candidate HashSet allocation)
+    let scale_filter_enabled = config.scale.overall_scale.len() < ET_SIZE;
+    let mut scale_bits = [false; ET_SIZE];
+    if scale_filter_enabled {
+        for &pc in &config.scale.overall_scale {
+            scale_bits[pc as usize] = true;
+        }
+    }
+
+    // Pre-compute chord library set for early filtering
+    let library = &config.chord_library.chord_library;
+    let library_filter_enabled = !library.is_empty();
+
+    let n_min = config.range.n_min;
+    let n_max = config.range.n_max;
+    let lowest = config.range.lowest;
+    let highest = config.range.highest;
+
     let num_expansions = expansion_count(m_notes_size as i32, m_max as i32);
     let mutation_range = MixedRadixRange::new(vl_max, m_max, vl_min);
     let mutations_per_expansion = mutation_range.total_count();
@@ -70,22 +90,56 @@ pub fn generate_single(
             iteration_count += 1;
             total_evaluated += 1;
 
-            // Apply mutation to the expanded chord
-            let mut out_of_range = false;
+            // Apply mutation to the expanded chord with early pruning
+            let mut rejected = false;
             let mut new_pitches: Vec<Pitch> = Vec::with_capacity(m_max);
+            let mut pc_bits = 0u16; // bitset for unique pitch classes
             for i in 0..m_max {
                 let new_midi = exp_pitches[i].get_number() as i32 + mutation_vec[i];
+                // MIDI range check
                 if new_midi < 0 || new_midi > 127 {
-                    out_of_range = true;
+                    rejected = true;
                     break;
                 }
+                // User-configured range check (replaces Stage 2 in pipeline)
+                if new_midi < lowest || new_midi > highest {
+                    rejected = true;
+                    break;
+                }
+                let pc = (new_midi % ET_SIZE as i32) as usize;
+                // Scale membership check (replaces Stage 8 in pipeline)
+                if scale_filter_enabled && !scale_bits[pc] {
+                    rejected = true;
+                    break;
+                }
+                pc_bits |= 1 << pc;
                 new_pitches.push(Pitch::new(new_midi as u8));
             }
-            if out_of_range {
+            if rejected {
                 if let Some(cb) = progress {
                     if iteration_count % 10000 == 0 { cb(iteration_count, total_iterations); }
                 }
                 continue;
+            }
+
+            // Early unique pitch-class count (n) check (replaces part of Stage 6)
+            let n = pc_bits.count_ones() as i32;
+            if n < n_min || n > n_max {
+                if let Some(cb) = progress {
+                    if iteration_count % 10000 == 0 { cb(iteration_count, total_iterations); }
+                }
+                continue;
+            }
+
+            // Early chord library check: reject if pitch-class set not in library
+            if library_filter_enabled {
+                let set_id = pc_bits as i32;
+                if !library.contains(&set_id) {
+                    if let Some(cb) = progress {
+                        if iteration_count % 10000 == 0 { cb(iteration_count, total_iterations); }
+                    }
+                    continue;
+                }
             }
 
             let candidate = OrderedChord::new(new_pitches);
@@ -96,6 +150,7 @@ pub fn generate_single(
                 prev_stats: &initial_stats,
                 vl_result: VoiceLeadingResult::default(),
                 candidate_stats: None,
+                candidate_single_chroma: None,
                 rec_ids: &mut rec_ids,
                 vec_ids: &mut vec_ids,
                 prev_single_chroma,
@@ -352,5 +407,3 @@ mod tests {
         }
     }
 }
-
-use crate::model::pitch_iterable::PitchIterable;
